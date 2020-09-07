@@ -6,13 +6,13 @@ A simple, fast, robust job/task queue for Node.js, backed by Redis.
 
 - Simple: ~1000 LOC, and minimal dependencies.
 - Fast: maximizes throughput by minimizing Redis and network overhead. [Benchmarks](#benchmarks) well.
-- Robust: designed with concurrency, atomicity, and failure in mind; close to full code coverage.
+- Robust: designed with concurrency, atomicity, and failure in mind; full code coverage.
 
 ```js
 const Queue = require('bee-queue');
 const queue = new Queue('example');
 
-const job = queue.createJob({x: 2, y: 3})
+const job = queue.createJob({x: 2, y: 3});
 job.save();
 job.on('succeeded', (result) => {
   console.log(`Received result for job ${job.id}: ${result}`);
@@ -56,7 +56,7 @@ Thanks to the folks at [Mixmax](https://mixmax.com), Bee-Queue is once again bei
 $ npm install bee-queue
 ```
 
-You'll also need [Redis 2.8+](http://redis.io/topics/quickstart)* running somewhere.
+You'll also need [Redis 2.8+](http://redis.io/topics/quickstart)\* running somewhere.
 
 \* We've been noticing that some jobs get delayed by virtue of an issue with Redis < 3.2, and therefore recommend the use of Redis 3.2+.
 
@@ -64,6 +64,7 @@ You'll also need [Redis 2.8+](http://redis.io/topics/quickstart)* running somewh
 
 - [Motivation](#motivation)
 - [Benchmarks](#benchmarks)
+- [Web Interface](#web-interface)
 - [Overview](#overview)
   - [Creating Queues](#creating-queues)
   - [Creating Jobs](#creating-jobs)
@@ -71,6 +72,7 @@ You'll also need [Redis 2.8+](http://redis.io/topics/quickstart)* running somewh
   - [Progress Reporting](#progress-reporting)
   - [Job & Queue Events](#job-and-queue-events)
   - [Stalling Jobs](#stalling-jobs)
+  - [Optimizing Redis Connections](#optimizing-redis-connections)
 - [API Reference](#api-reference)
 - [Under The Hood](#under-the-hood)
 - [Contributing](#contributing)
@@ -121,9 +123,9 @@ Queues are very lightweight — the only significant overhead is connecting to R
 ```js
 const subQueue = new Queue('subtraction', {
   redis: {
-    host: 'somewhereElse'
+    host: 'somewhereElse',
   },
-  isWorker: false
+  isWorker: false,
 });
 ```
 
@@ -195,14 +197,16 @@ Handlers can send progress reports, which will be received as events on the orig
 ```js
 const job = addQueue.createJob({x: 2, y: 3}).save();
 job.on('progress', (progress) => {
-  console.log(`Job ${job.id} reported progress: page ${progress.page} / ${progress.totalPages}`);
+  console.log(
+    `Job ${job.id} reported progress: page ${progress.page} / ${progress.totalPages}`
+  );
 });
 
 addQueue.process(async (job) => {
   // do some work
-  job.reportProgress({ page: 3, totalPages: 11 });
+  job.reportProgress({page: 3, totalPages: 11});
   // do more work
-  job.reportProgress({ page: 9, totalPages: 11 });
+  job.reportProgress({page: 9, totalPages: 11});
   // do the rest
 });
 ```
@@ -227,6 +231,54 @@ Bee-Queue attempts to provide ["at least once delivery"](http://www.cloudcomputi
 
 To make this happen, workers periodically phone home to Redis about each job they're working on, just to say "I'm still working on this and I haven't stalled, so you don't need to retry it." The [`checkStalledJobs`](#queuecheckstalledjobsinterval-cb) method finds any active jobs whose workers have gone silent (not phoned home for at least [`stallInterval`](#settings) ms), assumes they have stalled, emits a `stalled` event with the job id, and re-enqueues them to be picked up by another worker.
 
+## Optimizing Redis Connections
+
+By default, every time you create a queue instance with `new Queue()` a new redis connection will be created. If you have a small number of queues accross a large number of servers this will probably be fine. If you have a large number of queues with a small number of servers, this will probably be fine too. If your deployment gets a bit larger you will likely need to optimize the Redis connections.
+
+Let's say for example you have a web application with 30 producer queues and you run 10 webservers & 10 worker servers, each one with 4 processes/server. With the default settings this is going to add up to a lot of Redis connections. Each Redis connection consumes a fairly large chunk of memory, and it adds up quickly!
+
+The producer queues are the ones that run on the webserver and they push jobs into the queue. These queues do not need to receive events so they can all share one redis connection by passing in an instance of [node_redis `RedisClient`](https://github.com/NodeRedis/node_redis#rediscreateclient).
+
+Example:
+
+```js
+// producer queues running on the web server
+const Queue = require('bee-queue');
+const redis = require('redis');
+const sharedConfig = {
+  getEvents: false,
+  isWorker: false,
+  redis: redis.createClient(process.env.REDIS_URL),
+};
+
+const emailQueue = new Queue('EMAIL_DELIVERY', sharedConfig);
+const facebookUpdateQueue = new Queue('FACEBOOK_UPDATE', sharedConfig);
+
+emailQueue.createJob({});
+facebookUpdateQueue.createJob({});
+```
+
+Note that these "producer queues" above are only relevant for the processes that have to put jobs into the queue, not for the workers that need to actually process the jobs.
+
+In your worker process where you define how to process the job with `queue.process` you will have to run "worker queues" instead of "producer queues". In the example below, even though you are passing in the shared config with the same redis instance, because this is a worker queue Bee-Queue will `duplicate()` the client because it needs the blocking commands for PubSub subscriptions. This will result in a new connection for each queue.
+
+```js
+// worker queues running on the worker server
+const Queue = require('bee-queue');
+const redis = require('redis');
+const sharedConfig = {
+  redis: redis.createClient(process.env.REDIS_URL),
+};
+
+const emailQueue = new Queue('EMAIL_DELIVERY', sharedConfig);
+const facebookUpdateQueue = new Queue('FACEBOOK_UPDATE', sharedConfig);
+
+emailQueue.process((job) => {});
+facebookUpdateQueue.process((job) => {});
+```
+
+For a more detailed example and explanation see [#96](https://github.com/bee-queue/bee-queue/issues/96)
+
 # API Reference
 
 ## Queue
@@ -245,7 +297,7 @@ const queue = new Queue('test', {
     host: '127.0.0.1',
     port: 6379,
     db: 0,
-    options: {}
+    options: {},
   },
   isWorker: true,
   getEvents: true,
@@ -255,7 +307,7 @@ const queue = new Queue('test', {
   activateDelayedJobs: false,
   removeOnSuccess: false,
   removeOnFailure: false,
-  redisScanCount: 100
+  redisScanCount: 100,
 });
 ```
 
@@ -266,11 +318,13 @@ The `settings` fields are:
 - `nearTermWindow`: number, ms; the window during which delayed jobs will be specifically scheduled using `setTimeout` - if all delayed jobs are further out that this window, the Queue will double-check that it hasn't missed any jobs after the window elapses.
 - `delayedDebounce`: number, ms; to avoid unnecessary churn for several jobs in short succession, the Queue may delay individual jobs by up to this amount.
 - `redis`: object or string, specifies how to connect to Redis. See [`redis.createClient()`](https://github.com/NodeRedis/node_redis#rediscreateclient) for the full set of options.
+
   - `host`: string, Redis host.
   - `port`: number, Redis port.
   - `socket`: string, Redis socket to be used instead of a host and port.
 
   Note that this can also be a node_redis `RedisClient` instance, in which case Bee-Queue will issue normal commands over it. It will `duplicate()` the client for blocking commands and PubSub subscriptions, if enabled. This is advanced usage,
+
 - `isWorker`: boolean. Disable if this queue will not process jobs.
 - `getEvents`: boolean. Disable if this queue does not need to receive job events.
 - `sendEvents`: boolean. Disable if this worker does not need to send job events back to other queues.
@@ -328,7 +382,9 @@ This queue has successfully processed `job`. If `result` is defined, the handler
 
 ```js
 queue.on('retrying', (job, err) => {
-  console.log(`Job ${job.id} failed with error ${err.message} but is being retried!`);
+  console.log(
+    `Job ${job.id} failed with error ${err.message} but is being retried!`
+  );
 });
 ```
 
@@ -342,7 +398,7 @@ queue.on('failed', (job, err) => {
 });
 ```
 
-This queue has processed `job`, but its handler reported a failure either by rejecting its returned Promise, or by calling `done(err)`.
+This queue has processed `job`, but its handler reported a failure either by rejecting its returned Promise, or by calling `done(err)`. Note that if you pass an async function to process, you must reject it by returning `Promise.reject(...)` or throwing an exception ([done does not apply](https://github.com/bee-queue/bee-queue/issues/95)).
 
 #### stalled
 
@@ -376,7 +432,9 @@ Some worker has successfully processed job `jobId`. If `result` is defined, the 
 
 ```js
 queue.on('job retrying', (jobId, err) => {
-  console.log(`Job ${jobId} failed with error ${err.message} but is being retried!`);
+  console.log(
+    `Job ${jobId} failed with error ${err.message} but is being retried!`
+  );
 });
 ```
 
@@ -431,8 +489,7 @@ queue.getJob(3, function (err, job) {
   console.log(`Job 3 has status ${job.status}`);
 });
 
-queue.getJob(3)
-  .then((job) => console.log(`Job 3 has status ${job.status}`));
+queue.getJob(3).then((job) => console.log(`Job 3 has status ${job.status}`));
 ```
 
 Looks up a job by its `jobId`. The returned job will emit events if `getEvents` and `storeJobs` is true.
@@ -442,17 +499,15 @@ Be careful with this method; most potential uses would be better served by job e
 #### Queue#getJobs(type, page, [cb])
 
 ```js
-queue.getJobs('waiting', {start: 0, end: 25})
-  .then((jobs) => {
-    const jobIds = jobs.map((job) => job.id);
-    console.log(`Job ids: ${jobIds.join(' ')}`);
-  });
+queue.getJobs('waiting', {start: 0, end: 25}).then((jobs) => {
+  const jobIds = jobs.map((job) => job.id);
+  console.log(`Job ids: ${jobIds.join(' ')}`);
+});
 
-queue.getJobs('failed', {size: 100})
-  .then((jobs) => {
-    const jobIds = jobs.map((job) => job.id);
-    console.log(`Job ids: ${jobIds.join(' ')}`);
-  });
+queue.getJobs('failed', {size: 100}).then((jobs) => {
+  const jobIds = jobs.map((job) => job.id);
+  console.log(`Job ids: ${jobIds.join(' ')}`);
+});
 ```
 
 Looks up jobs by their queue type. When looking up jobs of type `waiting`, `active`, or `delayed`, `page` should be configured with `start` and `end` attributes to specify a range of job indices to return. Jobs of type `failed` and `succeeded` will return an arbitrary subset of the queue of size `page['size']`. Note: This is because failed and succeeded job types are represented by a Redis SET, which does not maintain a job ordering.
@@ -535,6 +590,27 @@ process.on('uncaughtException', async () => {
 });
 ```
 
+#### Queue#isRunning()
+
+Returns `true` unless the Queue is shutting down due to a call to `Queue#close()`.
+
+#### Queue#ready([cb])
+
+Promise resolves to the queue (or callback is called wth `null` argument) when the queue (and Redis) are ready for jobs. Learn more about `'ready'` in [Queue Local Events](#queue-local-events).
+
+```js
+const Queue = require('bee-queue');
+const queue = new Queue('example');
+queue
+  .ready()
+  .then(async (queue) => {
+    console.log('isRunning:', queue.isRunning());
+    const checkHealth = await queue.checkHealth();
+    console.log('checkHealth:', checkHealth);
+  })
+  .catch((err) => console.log('unreadyable', err));
+```
+
 #### Queue#removeJob(jobId, [cb])
 
 ```js
@@ -544,8 +620,7 @@ queue.removeJob(3, function (err) {
   }
 });
 
-queue.removeJob(3)
-  .then(() => console.log('Job 3 was removed'));
+queue.removeJob(3).then(() => console.log('Job 3 was removed'));
 ```
 
 Removes a job by its `jobId`. Idempotent.
@@ -563,8 +638,7 @@ queue.destroy(function (err) {
   }
 });
 
-queue.destroy()
-  .then(() => console.log('Queue was destroyed'));
+queue.destroy().then(() => console.log('Queue was destroyed'));
 ```
 
 Removes all Redis keys belonging to this queue (see [Under the hood](#under-the-hood)). Idempotent.
@@ -609,7 +683,9 @@ The job has succeeded. If `result` is defined, the handler called `done(null, re
 
 ```js
 job.on('retrying', (err) => {
-  console.log(`Job ${job.id} failed with error ${err.message} but is being retried!`);
+  console.log(
+    `Job ${job.id} failed with error ${err.message} but is being retried!`
+  );
 });
 ```
 
@@ -637,7 +713,7 @@ The job has sent a [progress report](#jobreportprogressn) of `progress` percent.
 
 ### Methods
 
-Each Job can be configured with the commands `.setId(id)`, `.retries(n)`, `.backoff(strategy, delayFactor)`, `.delayUntil(date|timestamp)`, and `.timeout(ms)`.
+Each Job can be configured with the chainable commands `.setId(id)`, `.retries(n)`, `.backoff(strategy, delayFactor)`, `.delayUntil(date|timestamp)`, and `.timeout(ms)`.
 
 #### Job#setId(id)
 

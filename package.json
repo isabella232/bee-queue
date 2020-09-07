@@ -4,18 +4,23 @@
   "description": "A simple, fast, robust job/task queue, backed by Redis.",
   "main": "index.js",
   "dependencies": {
-    "promise-callbacks": "^3.0.0",
+    "p-finally": "^1.0.0",
+    "promise-callbacks": "^3.8.1",
     "redis": "^2.7.1"
   },
   "devDependencies": {
-    "ava": "^0.21.0",
+    "ava": "^0.25.0",
     "ava-spec": "^1.1.0",
-    "coveralls": "^2.11.2",
-    "eslint": ">= 3",
-    "lolex": "^2.0.0",
-    "nyc": "^11.0.3",
+    "coveralls": "^3.0.11",
+    "eslint": "^7.8.1",
+    "eslint-config-prettier": "^6.10.1",
+    "eslint-plugin-prettier": "^3.1.2",
+    "lolex": "^6.0.0",
+    "nyc": "^15.0.1",
+    "prettier": "^2.0.4",
     "sandboxed-module": "^2.0.3",
-    "sinon": "^2.3.8"
+    "semver": "^7.2.1",
+    "sinon": "^7.5.0"
   },
   "files": [
     "HISTORY.md",
@@ -27,12 +32,13 @@
     "lib"
   ],
   "scripts": {
-    "test": "npm run eslint && ava",
-    "eslint": "eslint lib/ test/",
-    "coverage": "nyc ava",
-    "report": "npm run coverage && nyc report --reporter=html",
+    "ci": "if node -e '({...0})' 2>/dev/null && node -e '\"\".trimEnd()' 2>/dev/null; then npm run lint && npm run ci:coverage; else ava; fi",
+    "ci:coverage": "if [ -z \"$CI\" ]; then npm run coverage; else npm run coverage-and-publish; fi",
     "coverage-and-publish": "npm run coverage && nyc report --reporter=text-lcov | coveralls",
-    "ci": "npm run eslint && npm run coverage-and-publish"
+    "coverage": "nyc ava",
+    "lint": "eslint . && prettier --check '**/*.(html|json|md|sublime-project|ts|yml)'",
+    "report": "npm run coverage && nyc report --reporter=html",
+    "test": "npm run lint && ava"
   },
   "keywords": [
     "task",

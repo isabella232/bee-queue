@@ -1,50 +1,50 @@
-1.2.2 / 2018-01-25
-==================
+# 1.2.3 / 2020-01-28
 
-  * Update Typescript type definitions (thanks @brickyang for #98).
+- Allow arbitrary values for progress (#109).
+- Fix cleanup of event redis client (#178).
+- Fix bluebird warning spam (#85).
+- Update Typescript definition for `Queue#close` method (#180).
+- Remove Node 4, 6 from CI (#156, 223151c).
 
-1.2.1 / 2018-01-15
-==================
+# 1.2.2 / 2018-01-25
 
-  * Update Typescript type definitions (thanks @brickyang for #94).
+- Update Typescript type definitions (thanks @brickyang for #98).
 
-1.2.0 / 2018-01-10
-==================
+# 1.2.1 / 2018-01-15
 
-  * Add Typescript type definitions (thanks @pbadenski for #80 and @martinwepner for #89).
+- Update Typescript type definitions (thanks @brickyang for #94).
 
-1.1.0 / 2017-08-12
-==================
+# 1.2.0 / 2018-01-10
 
-  * Support sharing the redis command client between Queues.
-  * Add documentation, add tests for expected behavior.
+- Add Typescript type definitions (thanks @pbadenski for #80 and @martinwepner for #89).
 
-1.0.0 / 2017-06-30
-==================
+# 1.1.0 / 2017-08-12
 
-  * Upgrade node-redis to 2.7.1
-    Note that redis connection options now match the latest redis.
-  * Implement delayed jobs
-  * Implement fixed, exponential backoff strategies
-  * Add promise support
-  * Fix race conditions in tests
-  * Add new performance settings
-  * Emit stalled event for stalled jobs
-  * Implement graceful shutdown
-  * Support user-specified jobids (should be non-numeric)
-  * Add timeout, stacktraces to job options
+- Support sharing the redis command client between Queues.
+- Add documentation, add tests for expected behavior.
 
-0.3.0 / 2015-09-01
-==================
+# 1.0.0 / 2017-06-30
 
-  * Bump node-redis dependency to 1.0.0
+- Upgrade node-redis to 2.7.1
+  Note that redis connection options now match the latest redis.
+- Implement delayed jobs
+- Implement fixed, exponential backoff strategies
+- Add promise support
+- Fix race conditions in tests
+- Add new performance settings
+- Emit stalled event for stalled jobs
+- Implement graceful shutdown
+- Support user-specified jobids (should be non-numeric)
+- Add timeout, stacktraces to job options
 
-0.2.0 / 2015-06-12
-==================
+# 0.3.0 / 2015-09-01
 
-  * Initial release
+- Bump node-redis dependency to 1.0.0
 
-0.1.0 / 2015-01-26
-==================
+# 0.2.0 / 2015-06-12
 
-  * Early development
+- Initial release
+
+# 0.1.0 / 2015-01-26
+
+- Early development

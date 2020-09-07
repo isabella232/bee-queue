@@ -1,10 +1,15 @@
 language: node_js
 node_js:
-  - 4
-  - 6
+  - 4.0
   - 8
-  - 9
+  - 10
+  - node
+
+git:
+  autocrlf: input
+
 services: redis
+install: npm ci || (nvm i --lts --latest-npm && npm ci; nvm use "$TRAVIS_NODE_VERSION")
 # this runs eslint, runs the tests, instruments their coverage, and
 # publishes it to coveralls.io
 script: npm run ci
